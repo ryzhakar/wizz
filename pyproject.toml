@@ -37,6 +37,7 @@ annoy = "^1.17.3"
 tiktoken = "^0.6.0"
 aiorwlock = "^1.4.0"
 aiosqlite = "^0.20.0"
+greenlet = "^3.0.3"
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = "^0.18.0"

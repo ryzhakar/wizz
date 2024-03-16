@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 from wizz.constants import DATABASE_URL
 from wizz.models.base import Base
+from wizz.models.knowledge import *
 
 config = context.config
 if config.config_file_name is not None:

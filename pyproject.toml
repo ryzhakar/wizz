@@ -1,14 +1,27 @@
 [tool.poetry]
 name = "wizz"
 version = "0.1.0"
-description = ""
+description = "A terminal-based LLM chat client with knowledge retrieval."
 authors = ["Arthur Ryzhak <ryzhakar@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/ryzhakar/wizz"
 repository = "https://github.com/ryzhakar/wizz"
-keywords = []
-classifiers = []
+keywords = ["chat-client", "local-LLMs", "terminal", "query-response", "AI", "natural-language-processing"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Education",
+  "Intended Audience :: Science/Research",
+  "Topic :: Communications :: Chat",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Operating System :: OS Independent",
+  "Natural Language :: English",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -17,6 +30,13 @@ sqlalchemy = "^2"
 langchain = "^0.1.12"
 langchain-cli = "^0.0.21"
 alembic = "^1.13.1"
+sqlalchemy2-stubs = "^0.0.2a38"
+numpy = "^1.26.4"
+sentence-transformers = "^2.5.1"
+annoy = "^1.17.3"
+tiktoken = "^0.6.0"
+aiorwlock = "^1.4.0"
+aiosqlite = "^0.20.0"
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = "^0.18.0"

@@ -1,12 +1,17 @@
+import asyncio
 from logging import getLogger
 
 import typer
+from devtools import debug
+from rich import print as rich_print
+from rich.prompt import Prompt
 
 from wizz import crud
 from wizz.database import get_db_session
 from wizz.extraction import converters
 from wizz.extraction.batcher import TextBatcher
 from wizz.extraction.embedder import Embedder
+from wizz.extraction.indexer import AnnoyReader
 from wizz.extraction.indexer import AnnoyWriter
 from wizz.filesystem import stream_files_from
 from wizz.syncer import synchronize_async_command
@@ -14,6 +19,36 @@ from wizz.syncer import synchronize_async_command
 logger = getLogger('wizz')
 
 app = typer.Typer(invoke_without_command=False)
+
+
+@synchronize_async_command(app)
+async def search(  # noqa: WPS210, WPS217
+    context_name: str = typer.Option(  # noqa: WPS404, B008
+        ...,
+        help='The name of the context to bind the knowledge to.',
+    ),
+):
+    """Search the knowledge base for a query."""
+    embedder = Embedder()
+    async with get_db_session() as session:
+        async with AnnoyReader(context_name) as reader:
+            while query := Prompt.ask('Enter a query'):
+                lookup_indices = await reader.get_neighbours_for(
+                    vector=embedder(query),
+                    n=5,
+                )
+                multiple_blobs = await crud.load_set_of_blobs(
+                    session,
+                    blob_ids=set(lookup_indices),
+                )
+                sources = await asyncio.gather(
+                    *(blob.awaitable_attrs.source for blob in multiple_blobs),
+                )
+                ellipted_texts = [
+                    f'{source.name}:\n"""...{blob.text}..."""'
+                    for source, blob in zip(sources, multiple_blobs)
+                ]
+                rich_print(*ellipted_texts, sep='\n\n')
 
 
 @synchronize_async_command(app)
@@ -74,3 +109,4 @@ async def load(  # noqa: WPS210, WPS217
                     blob.id,
                     converters.hex_to_vector(blob.vector_hex),
                 )
+            debug(writer.manager.index.get_n_items())

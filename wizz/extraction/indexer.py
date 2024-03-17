@@ -8,7 +8,6 @@ import numpy as np
 from aiorwlock import RWLock
 from annoy import AnnoyIndex
 from numpy import ndarray
-from numpy import zeros
 
 from wizz.extraction import constants
 
@@ -19,30 +18,30 @@ class AnnoyIndexManager:
     def __init__(
         self,
         user_id: str,
-        read_mode: bool = True,
     ):
         """Initialize a user-specific Annoy index."""
         self.user_id = user_id
+        self.lock = RWLock()
+        self.create_new_internal_instance()
+        self.ready = True
+
+    def create_new_internal_instance(self):
+        """Create a new Annoy index instance."""
         self.index = AnnoyIndex(
             constants.EMBEDDING_DIM,
             constants.ANNOY_METRIC,
         )
-        self.lock = RWLock()
-        self.refresh_index_connection()
-        self.read_mode = read_mode
 
-    def refresh_index_connection(self) -> None:
+    def load_if_exists(self) -> bool:
         """Load the index memory-mapping from disk."""
-        if not os.path.exists(constants.ANNOY_INDICES_STORE_PATH):
-            os.makedirs(constants.ANNOY_INDICES_STORE_PATH)
-        if not os.path.exists(self.path):
-            self.index.add_item(
-                0,
-                zeros(constants.EMBEDDING_DIM, dtype=constants.DTYPE),
-            )
-            self.index.build(10)
-            self.index.save(self.path)
-        self.index.load(self.path)
+        try:
+            if self.index.get_n_items():
+                return True
+        except Exception:
+            if os.path.exists(self.path):
+                self.index.load(self.path)
+                return True
+        return False
 
     @property
     def path(self) -> str:
@@ -65,6 +64,12 @@ class AnnoyReader:
     def __init__(self, index_name: str):
         """Initialize the index manager."""
         self.manager = get_index_manager(index_name)
+        self.manager.ready = self.manager.load_if_exists()
+        if not self.manager.ready:
+            raise ValueError(
+                'Index %s does not exist.',
+                self.manager.path,
+            )
 
     async def __aenter__(self) -> Self:
         """Acquire a read lock."""
@@ -79,7 +84,7 @@ class AnnoyReader:
         self,
         *,
         vector: ndarray,
-        n: int = 10,  # noqa: WPS111
+        n: int = 3,  # noqa: WPS111
     ) -> list[int]:
         """Get the indices of the n nearest neighbors to a vector."""
         return self.manager.index.get_nns_by_vector(vector, n)
@@ -102,13 +107,13 @@ class AnnoyWriter:
     async def __aenter__(self) -> Self:
         """Acquire a write lock."""
         await self.manager.lock.writer_lock.acquire()
-        self.manager.index.unload()
+        self.manager.create_new_internal_instance()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
         """Release a write lock and refresh the index memory-mapping."""
-        self.manager.index.on_disk_build(self.manager.path)
-        self.manager.refresh_index_connection()
+        self.manager.index.build(10)
+        self.manager.index.save(self.manager.path)
         self.manager.lock.writer_lock.release()
 
     async def add_item(self, index: int, vector: ndarray) -> None:

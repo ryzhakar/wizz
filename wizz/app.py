@@ -1,15 +1,14 @@
+import logging
+
 from typer import Typer
 
-from wizz.syncer import synchronize_async_command
+from wizz.commands import knowledge
+
+# Set loglevel to DEBUG
+logging.basicConfig(level=logging.INFO)
 
 app = Typer()
-
-
-@synchronize_async_command(app)
-async def main():
-    """Test the Typer app."""
-    print('Hello, world!')  # noqa: WPS421
-
+app.add_typer(knowledge.app, name='knowledge')
 
 if __name__ == '__main__':
     app()

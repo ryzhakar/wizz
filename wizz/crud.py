@@ -43,6 +43,32 @@ async def get_or_create_context(
 
 
 @optional_commit
+async def cascade_delete_context(
+    session: AsyncSession,
+    *,
+    context: knowledge.Context,
+) -> None:
+    """Delete a Context and all its associated Sources and Blobs."""
+    await session.execute(
+        knowledge.Blob.__table__.delete().where(
+            knowledge.Blob.source_id.in_(
+                select(knowledge.Source.id).filter_by(context=context),
+            ),
+        ),
+    )
+    await session.execute(
+        knowledge.Source.__table__.delete().where(
+            knowledge.Source.context == context,
+        ),
+    )
+    await session.execute(
+        knowledge.Context.__table__.delete().where(
+            knowledge.Context.id == context.id,
+        ),
+    )
+
+
+@optional_commit
 async def create_source(
     session: AsyncSession,
     *,

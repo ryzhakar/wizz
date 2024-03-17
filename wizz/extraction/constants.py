@@ -14,5 +14,5 @@ ANNOY_INDICES_STORE_PATH = 'annoy_indices'
 DTYPE = np.float32
 
 
-CHUNK_SIZE = 500
+CHUNK_SIZE = 100
 CHUNK_OVERLAP = int(CHUNK_SIZE // PHI ** 6)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from logging import getLogger
 from typing import Self
 
 import numpy as np
@@ -10,6 +11,7 @@ from annoy import AnnoyIndex
 from numpy import ndarray
 
 from wizz.extraction import constants
+logger = getLogger('wizz')
 
 
 class AnnoyIndexManager:
@@ -34,13 +36,18 @@ class AnnoyIndexManager:
 
     def load_if_exists(self) -> bool:
         """Load the index memory-mapping from disk."""
+        if not os.path.exists(constants.ANNOY_INDICES_STORE_PATH):
+            os.makedirs(constants.ANNOY_INDICES_STORE_PATH)
         try:
             if self.index.get_n_items():
                 return True
         except Exception:
-            if os.path.exists(self.path):
-                self.index.load(self.path)
-                return True
+            logger.debug(
+                'Could not check the size of {self.path} index.',
+            )
+        if os.path.exists(self.path):
+            self.index.load(self.path)
+            return True
         return False
 
     @property
@@ -67,8 +74,8 @@ class AnnoyReader:
         self.manager.ready = self.manager.load_if_exists()
         if not self.manager.ready:
             raise ValueError(
-                'Index %s does not exist.',
-                self.manager.path,
+                'Index %s does not exist.'
+                % self.manager.path,
             )
 
     async def __aenter__(self) -> Self:

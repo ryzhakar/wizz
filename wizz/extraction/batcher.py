@@ -9,7 +9,7 @@ from wizz.extraction.constants import CHUNK_OVERLAP
 from wizz.extraction.constants import CHUNK_SIZE
 
 
-logger = getLogger('feature_extraction')
+logger = getLogger('wizz')
 
 
 class TextBatcher:
@@ -23,7 +23,7 @@ class TextBatcher:
     ) -> None:
         """Initializes the batcher with an iterable of strings."""
         is_single_string = isinstance(texts, str)
-        logger.debug(
+        logger.info(
             'Initializing TextBatcher. Stream is a single text: %s',
             is_single_string,
         )

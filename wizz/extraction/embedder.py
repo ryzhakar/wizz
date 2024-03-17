@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 from wizz.extraction.constants import EMBEDDING_CACHE_PATH
 from wizz.extraction.constants import EMBEDDING_MODEL
 
-logger = getLogger('feature_extraction')
+logger = getLogger('wizz')
 
 
 class Embedder(SentenceTransformer):
@@ -15,7 +15,7 @@ class Embedder(SentenceTransformer):
 
     def __init__(self):
         """Initialize without options."""
-        logger.debug('Initializing embedder with model: %s', EMBEDDING_MODEL)
+        logger.info('Initializing embedder with model: %s', EMBEDDING_MODEL)
         super().__init__(
             EMBEDDING_MODEL,
             cache_folder=EMBEDDING_CACHE_PATH,
@@ -27,5 +27,5 @@ class Embedder(SentenceTransformer):
 
     def encode(self, section: str) -> ndarray:
         """Only support string encodings into ndarrays."""
-        logger.debug('Encoding section of length: %s', len(section))
+        logger.info('Encoding section of length: %s', len(section))
         return cast(ndarray, super().encode(section))

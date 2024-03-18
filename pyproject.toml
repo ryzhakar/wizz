@@ -27,10 +27,8 @@ classifiers = [
 python = "^3.11"
 typer = {extras = ["all"], version = "^0.9.0"}
 sqlalchemy = "^2"
-langchain = "^0.1.12"
-langchain-cli = "^0.0.21"
-alembic = "^1.13.1"
 sqlalchemy2-stubs = "^0.0.2a38"
+alembic = "^1.13.1"
 numpy = "^1.26.4"
 sentence-transformers = "^2.5.1"
 annoy = "^1.17.3"
@@ -39,6 +37,9 @@ aiorwlock = "^1.4.0"
 aiosqlite = "^0.20.0"
 greenlet = "^3.0.3"
 async-annoy = ">=0.2.0"
+transformers = "^4.38.2"
+pydantic = "^2.6.4"
+accelerate = "^0.28.0"
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = "^0.18.0"

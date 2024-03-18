@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wizz"
-version = "0.2.0"
+version = "0.2.1"
 description = "A terminal-based LLM chat client with knowledge retrieval."
 authors = ["Arthur Ryzhak <ryzhakar@gmail.com>"]
 license = "MIT"
@@ -38,6 +38,7 @@ tiktoken = "^0.6.0"
 aiorwlock = "^1.4.0"
 aiosqlite = "^0.20.0"
 greenlet = "^3.0.3"
+async-annoy = ">=0.2.0"
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = "^0.18.0"

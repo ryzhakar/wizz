@@ -2,6 +2,7 @@ import asyncio
 from logging import getLogger
 
 import typer
+from async_annoy import AsyncAnnoy
 from rich import print as rich_print
 from rich.progress import Progress
 from rich.prompt import Confirm
@@ -12,8 +13,6 @@ from wizz.database import get_db_session
 from wizz.extraction import converters
 from wizz.extraction.batcher import TextBatcher
 from wizz.extraction.embedder import Embedder
-from wizz.extraction.indexer import AnnoyReader
-from wizz.extraction.indexer import AnnoyWriter
 from wizz.filesystem import get_file_streamer
 from wizz.filesystem import shorten_filename
 from wizz.syncer import synchronize_async_command
@@ -60,7 +59,7 @@ async def search(  # noqa: WPS210, WPS217
     """Search the knowledge base for a query."""
     embedder = Embedder()
     async with get_db_session() as session:
-        async with AnnoyReader(context_name) as reader:
+        async with AsyncAnnoy(context_name).reader() as reader:
             while query := Prompt.ask('Enter a query'):
                 lookup_indices = await reader.get_neighbours_for(
                     vector=embedder(query),
@@ -78,6 +77,7 @@ async def search(  # noqa: WPS210, WPS217
                     for source, blob in zip(sources, multiple_blobs)
                 ]
                 rich_print(*ellipted_texts, sep='\n\n')
+    rich_print('Goodbye!')
 
 
 @synchronize_async_command(app)
@@ -140,7 +140,7 @@ async def load(  # noqa: WPS210, WPS217
                 await session.commit()
                 progress.update(blob_task, visible=False)
                 progress.update(file_task, advance=1)
-            async with AnnoyWriter(context_name) as writer:
+            async with AsyncAnnoy(context_name).writer() as writer:
                 blob_stream = await crud.stream_blobs(
                     session,
                     context=context_instance,

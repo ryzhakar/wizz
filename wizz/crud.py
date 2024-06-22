@@ -75,15 +75,36 @@ async def create_source(
     context: knowledge.Context,
     name: str,
     content_hash: str,
+    vector_hex: str,
 ) -> knowledge.Source:
     """Create a new Source."""
     source_instance = knowledge.Source(
         context=context,
         name=name,
         hash=content_hash,
+        vector_hex=vector_hex,
     )
     session.add(source_instance)
     return source_instance
+
+
+async def stream_sources(
+    session: AsyncSession,
+    *,
+    context: knowledge.Context,
+) -> Iterable[knowledge.Source]:
+    """List all Sources in a given Context."""
+    query_result = await session.execute(
+        select(
+            knowledge.Source,
+        ).join(
+            knowledge.Context,
+            knowledge.Source.context_id == knowledge.Context.id,
+        ).filter(
+            knowledge.Context.id == context.id,
+        ),
+    )
+    return query_result.scalars()
 
 
 async def stream_blobs(

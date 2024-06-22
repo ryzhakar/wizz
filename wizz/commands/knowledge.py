@@ -63,7 +63,8 @@ async def interact(  # noqa: WPS210, WPS217
     retriever = Retriever()
     embedder = Embedder()
     async with get_db_session() as session:
-        async with AsyncAnnoy(context_name).reader() as reader:
+        blob_ix_name = converters.to_blob_ix_name(context_name)
+        async with AsyncAnnoy(blob_ix_name).reader() as reader:
             while query := rich_prompt.Prompt.ask('\n\n'):
                 query = retriever.construct_query(query)
                 lookup_indices = await reader.get_neighbours_for(
@@ -100,7 +101,8 @@ async def search(  # noqa: WPS210, WPS217
     embedder = Embedder()
     retriever = Retriever()
     async with get_db_session() as session:
-        async with AsyncAnnoy(context_name).reader() as reader:
+        blob_ix_name = converters.to_blob_ix_name(context_name)
+        async with AsyncAnnoy(blob_ix_name).reader() as reader:
             while query := rich_prompt.Prompt.ask('Enter a query'):
                 lookup_indices = await reader.get_neighbours_for(
                     vector=embedder(query),
@@ -122,7 +124,7 @@ async def search(  # noqa: WPS210, WPS217
 
 
 @synchronize_async_command(app)
-async def load(  # noqa: WPS210, WPS217
+async def load(  # noqa: WPS210, WPS213, WPS217
     context_name: str = typer.Option(  # noqa: WPS404, B008
         ...,
         help='The name of the context to bind the knowledge to.',
@@ -160,36 +162,54 @@ async def load(  # noqa: WPS210, WPS217
                     shorten_filename(filename),
                     total=None,
                 )
+                source_vector_hex = converters.vector_to_hex(
+                    embedder(filecontent),
+                )
                 source_instance = await crud.create_source(
                     session,
                     context=context_instance,
                     name=filename,
                     content_hash=hashstr,
+                    vector_hex=source_vector_hex,
                     commit=False,  # type: ignore
                 )
                 await session.commit()
                 for ix, textblob in TextBatcher(filecontent):
-                    vector_hex = converters.vector_to_hex(embedder(textblob))
+                    blob_vector_hex = converters.vector_to_hex(
+                        embedder(textblob),
+                    )
                     await crud.create_blob(
                         session,
                         source=source_instance,
                         text=textblob,
                         index=ix,
-                        vector_hex=vector_hex,
+                        vector_hex=blob_vector_hex,
                         commit=False,  # type: ignore
                     )
                 await session.commit()
                 progress.update(blob_task, visible=False)
                 progress.update(file_task, advance=1)
-            async with AsyncAnnoy(context_name).writer() as writer:
+            blob_index_name = converters.to_blob_ix_name(context_name)
+            source_index_name = converters.to_source_ix_name(context_name)
+            async with AsyncAnnoy(blob_index_name).writer() as bwriter:
                 blob_stream = await crud.stream_blobs(
                     session,
                     context=context_instance,
                 )
                 for blob in blob_stream:
-                    await writer.add_item(
+                    await bwriter.add_item(
                         blob.id,
                         converters.hex_to_vector(blob.vector_hex),
+                    )
+            async with AsyncAnnoy(source_index_name).writer() as swriter:
+                source_stream = await crud.stream_sources(
+                    session,
+                    context=context_instance,
+                )
+                for source in source_stream:
+                    await swriter.add_item(
+                        source.id,
+                        converters.hex_to_vector(source.vector_hex),
                     )
     rich_print(
         'Skipped {skipped} already loaded files.'.format(

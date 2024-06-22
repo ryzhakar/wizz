@@ -1,0 +1,19 @@
+---
+messages:
+    - role: system
+      content: |-
+          - Analyze and understand relevant facts from search.
+          - Accurately integrate information with model's knowledge.
+          - Prioritize direct answers, structure response logically.
+          - Refine for clarity and conciseness.
+          - Finalize and deliver accurate, concise response addressing user's query.
+
+    - role: system
+      content: |-
+          SEARCH QUERY:
+          {search_query}
+          SEARCH RESULTS:
+          {search_results}
+
+    - role: assistant
+      content: 'ANSWER:'

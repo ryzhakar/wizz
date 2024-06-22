@@ -1,0 +1,18 @@
+---
+messages:
+    - role: system
+      content: |-
+          - Focus: Decode user input to core question.
+          - Extract: Keywords, essential phrases.
+          - Context: Recognize clues, specifics.
+          - Intent: Determine - facts, explanations, comparisons.
+          - Merge: Keywords with relevant terms.
+          - Relevance: Ensure direct relation to user's request.
+          - Clarity: Refine, eliminate redundancies.
+          - Precision: Adjust to sharpen focus on intent.
+          - Output: Single sentence plaintext query, no extras.
+          - Instruction: Generate singular, focused query sentence.
+    - role: user
+      content: What query would fit the context of our chat and my last question?
+    - role: assistant
+      content: 'QUERY: '

@@ -3,12 +3,13 @@ from logging import getLogger
 
 import typer
 from async_annoy import AsyncAnnoy
+from dotenv import load_dotenv
 from rich import print as rich_print
+from rich import prompt as rich_prompt
 from rich.progress import Progress
-from rich.prompt import Confirm
-from rich.prompt import Prompt
 
 from wizz import crud
+from wizz.agent.retriever import Retriever
 from wizz.database import get_db_session
 from wizz.extraction import converters
 from wizz.extraction.batcher import TextBatcher
@@ -16,6 +17,8 @@ from wizz.extraction.embedder import Embedder
 from wizz.filesystem import get_file_streamer
 from wizz.filesystem import shorten_filename
 from wizz.syncer import synchronize_async_command
+
+load_dotenv()
 
 logger = getLogger('wizz')
 
@@ -30,7 +33,7 @@ async def delete(  # noqa: WPS210, WPS217
     ),
 ):
     """Delete a context and all its associated sources and blobs."""
-    confirmed = Confirm.ask(
+    confirmed = rich_prompt.Confirm.ask(
         f'This means deleting the knowledge base for {context_name}. '
         'Are you sure?',
     )
@@ -50,6 +53,43 @@ async def delete(  # noqa: WPS210, WPS217
 
 
 @synchronize_async_command(app)
+async def interact(  # noqa: WPS210, WPS217
+    context_name: str = typer.Option(  # noqa: WPS404, B008
+        ...,
+        help='The name of the context to bind the knowledge to.',
+    ),
+):
+    """Search the knowledge base for a query."""
+    retriever = Retriever()
+    embedder = Embedder()
+    async with get_db_session() as session:
+        async with AsyncAnnoy(context_name).reader() as reader:
+            while query := rich_prompt.Prompt.ask('\n\n'):
+                query = retriever.construct_query(query)
+                lookup_indices = await reader.get_neighbours_for(
+                    vector=embedder(query),
+                    n=5,
+                )
+                multiple_blobs = await crud.load_set_of_blobs(
+                    session,
+                    blob_ids=set(lookup_indices),
+                )
+                sources = await asyncio.gather(
+                    *(blob.awaitable_attrs.source for blob in multiple_blobs),
+                )
+                ellipted_texts = [
+                    f'{source.name}:\n"""...{blob.text}..."""'
+                    for source, blob in zip(sources, multiple_blobs)
+                ]
+                answer = retriever.request_answer_based_on(
+                    *ellipted_texts,
+                    query=query,
+                )
+                rich_print(answer, sep='\n\n')
+    rich_print('Goodbye!')
+
+
+@synchronize_async_command(app)
 async def search(  # noqa: WPS210, WPS217
     context_name: str = typer.Option(  # noqa: WPS404, B008
         ...,
@@ -60,7 +100,7 @@ async def search(  # noqa: WPS210, WPS217
     embedder = Embedder()
     async with get_db_session() as session:
         async with AsyncAnnoy(context_name).reader() as reader:
-            while query := Prompt.ask('Enter a query'):
+            while query := rich_prompt.Prompt.ask('Enter a query'):
                 lookup_indices = await reader.get_neighbours_for(
                     vector=embedder(query),
                     n=5,

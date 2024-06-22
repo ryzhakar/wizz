@@ -78,7 +78,7 @@ async def interact(  # noqa: WPS210, WPS217
                     *(blob.awaitable_attrs.source for blob in multiple_blobs),
                 )
                 ellipted_texts = [
-                    f'{source.name}:\n"""...{blob.text}..."""'
+                    retriever.wrap_result(source.name, blob.text)
                     for source, blob in zip(sources, multiple_blobs)
                 ]
                 answer = retriever.request_answer_based_on(
@@ -98,6 +98,7 @@ async def search(  # noqa: WPS210, WPS217
 ):
     """Search the knowledge base for a query."""
     embedder = Embedder()
+    retriever = Retriever()
     async with get_db_session() as session:
         async with AsyncAnnoy(context_name).reader() as reader:
             while query := rich_prompt.Prompt.ask('Enter a query'):
@@ -113,7 +114,7 @@ async def search(  # noqa: WPS210, WPS217
                     *(blob.awaitable_attrs.source for blob in multiple_blobs),
                 )
                 ellipted_texts = [
-                    f'{source.name}:\n"""...{blob.text}..."""'
+                    retriever.wrap_result(source.name, blob.text)
                     for source, blob in zip(sources, multiple_blobs)
                 ]
                 rich_print(*ellipted_texts, sep='\n\n')

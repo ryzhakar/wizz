@@ -127,7 +127,7 @@ async def load(  # noqa: WPS210, WPS217
                     commit=False,  # type: ignore
                 )
                 await session.commit()
-                for ix, textblob in enumerate(TextBatcher(filecontent)):
+                for ix, textblob in TextBatcher(filecontent):
                     vector_hex = converters.vector_to_hex(embedder(textblob))
                     await crud.create_blob(
                         session,

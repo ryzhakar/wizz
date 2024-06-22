@@ -115,7 +115,12 @@ async def load_set_of_blobs(
 ) -> list[knowledge.Blob]:
     """Load a set of Blobs by their IDs."""
     query_result = await session.execute(
-        select(knowledge.Blob).filter(knowledge.Blob.id.in_(blob_ids)),
+        select(knowledge.Blob).filter(
+            knowledge.Blob.id.in_(blob_ids),
+        ).order_by(
+            knowledge.Blob.source_id,
+            knowledge.Blob.blob_index,
+        ),
     )
     return query_result.scalars().all()
 

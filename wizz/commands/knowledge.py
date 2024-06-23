@@ -285,21 +285,24 @@ async def index(  # noqa: WPS210, WPS213, WPS217
             )
             async with AsyncAnnoy(source_index_name).reader() as source_reader:
                 for blb, vector, origin_distance in outliers.values():
-                    destination_ids = await source_reader.get_neighbours_for(
-                        vector=vector,
-                        n=1,
+                    ranked_destinations = (
+                        await source_reader.get_ranked_neighbours_for(
+                            vector=vector,
+                            n=1,
+                        )
                     )
+                    destination_id, destination_dist = ranked_destinations[0]
                     destination = await crud.get_single_object(
                         session,
                         model=knowledge_models.Source,
-                        object_id=destination_ids[0],
+                        object_id=destination_id,
                     )
                     await crud.create_link(
                         session,
                         blob=blb,
                         target_source=destination,
                         origin_distance=origin_distance,
-                        destination_distance=0,
+                        destination_distance=destination_dist,
                     )
                     progress.update(linking_task, advance=1)
                 await session.commit()

@@ -71,6 +71,28 @@ async def cascade_delete_context(
 
 
 @optional_commit
+async def remove_all_links_for(
+    session: AsyncSession,
+    *,
+    context: knowledge.Context,
+) -> None:
+    """Remove all Links either originating or pointing to a Context."""
+    source_ids = select(knowledge.Source.id).filter_by(context=context)
+    blob_ids = select(knowledge.Blob.id).filter(
+        knowledge.Blob.source_id.in_(source_ids),
+    )
+    await session.execute(
+        knowledge.Link.__table__.delete().where(
+            (
+                knowledge.Link.blob_id.in_(blob_ids)
+            ) | (
+                knowledge.Link.target_source_id.in_(source_ids)
+            ),
+        ),
+    )
+
+
+@optional_commit
 async def create_source(
     session: AsyncSession,
     *,

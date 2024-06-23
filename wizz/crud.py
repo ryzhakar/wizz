@@ -1,10 +1,12 @@
 from collections.abc import Iterable
 from functools import wraps
+from typing import Type
 
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from wizz.models import base
 from wizz.models import knowledge
 
 
@@ -88,6 +90,57 @@ async def create_source(
     return source_instance
 
 
+@optional_commit
+async def create_blob(
+    session: AsyncSession,
+    *,
+    source: knowledge.Source,
+    text: str,
+    index: int,
+    vector_hex: str,
+) -> knowledge.Blob:
+    """Create a new Blob record."""
+    blob_instance = knowledge.Blob(
+        source=source,
+        text=text,
+        blob_index=index,
+        vector_hex=vector_hex,
+    )
+    session.add(blob_instance)
+    return blob_instance
+
+
+@optional_commit
+async def create_link(
+    session: AsyncSession,
+    *,
+    blob: knowledge.Blob,
+    target_source: knowledge.Source,
+    origin_distance: float,
+    destination_distance: float,
+) -> knowledge.Link:
+    """Create a new Link record."""
+    link_instance = knowledge.Link(
+        blob=blob,
+        target_source=target_source,
+        origin_distance=origin_distance,
+        destination_distance=destination_distance,
+    )
+    session.add(link_instance)
+    return link_instance
+
+
+# This is pretty dumb, but I want to avoid using naked session.execute
+async def get_single_object(
+    session: AsyncSession,
+    *,
+    model: type[base.Base],
+    object_id: int,
+) -> base.Base | None:
+    """Get an object of the specified model by its ID."""
+    return await session.get(model, object_id)
+
+
 async def stream_sources(
     session: AsyncSession,
     *,
@@ -156,23 +209,3 @@ async def does_source_exist(
         select(knowledge.Source).filter_by(hash=hashstring),
     )
     return query_result.scalar() is not None
-
-
-@optional_commit
-async def create_blob(
-    session: AsyncSession,
-    *,
-    source: knowledge.Source,
-    text: str,
-    index: int,
-    vector_hex: str,
-) -> knowledge.Blob:
-    """Create a new Blob record."""
-    blob_instance = knowledge.Blob(
-        source=source,
-        text=text,
-        blob_index=index,
-        vector_hex=vector_hex,
-    )
-    session.add(blob_instance)
-    return blob_instance

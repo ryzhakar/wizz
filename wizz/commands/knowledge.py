@@ -14,8 +14,10 @@ from wizz.database import get_db_session
 from wizz.extraction import converters
 from wizz.extraction.batcher import TextBatcher
 from wizz.extraction.embedder import Embedder
+from wizz.extraction.outlier_finder import find_outliers_for
 from wizz.filesystem import get_file_streamer
 from wizz.filesystem import shorten_filename
+from wizz.models import knowledge as knowledge_models
 from wizz.syncer import synchronize_async_command
 
 load_dotenv()
@@ -189,18 +191,42 @@ async def load(  # noqa: WPS210, WPS213, WPS217
                 await session.commit()
                 progress.update(blob_task, visible=False)
                 progress.update(file_task, advance=1)
-            blob_index_name = converters.to_blob_ix_name(context_name)
+    rich_print(
+        'Skipped {skipped} already loaded files.'.format(
+            skipped=number_of_existing_files,
+        ),
+        'Loaded {delta} new files into the knowledge base.'.format(
+            delta=number_of_files - number_of_existing_files,
+        ),
+        sep='\n',
+    )
+
+
+@synchronize_async_command(app)
+async def index(  # noqa: WPS210, WPS213, WPS217
+    context_name: str = typer.Option(  # noqa: WPS404, B008
+        ...,
+        help='The name of the knowledge context.',
+    ),
+) -> None:
+    """Add semantic coordinates to indices and build links."""
+    with Progress(transient=True, refresh_per_second=2) as progress:
+        async with get_db_session() as session:
+            context_instance = await crud.get_or_create_context(
+                session,
+                name=context_name,
+            )
+
+            # Index sources
+            total_sources = await crud.count_objects(
+                session,
+                model=knowledge_models.Source,
+            )
+            source_indexing_task = progress.add_task(
+                'Indexing sources...',
+                total=total_sources,
+            )
             source_index_name = converters.to_source_ix_name(context_name)
-            async with AsyncAnnoy(blob_index_name).writer() as bwriter:
-                blob_stream = await crud.stream_blobs(
-                    session,
-                    context=context_instance,
-                )
-                for blob in blob_stream:
-                    await bwriter.add_item(
-                        blob.id,
-                        converters.hex_to_vector(blob.vector_hex),
-                    )
             async with AsyncAnnoy(source_index_name).writer() as swriter:
                 source_stream = await crud.stream_sources(
                     session,
@@ -211,12 +237,71 @@ async def load(  # noqa: WPS210, WPS213, WPS217
                         source.id,
                         converters.hex_to_vector(source.vector_hex),
                     )
-    rich_print(
-        'Skipped {skipped} already loaded files.'.format(
-            skipped=number_of_existing_files,
-        ),
-        'Loaded {delta} new files into the knowledge base.'.format(
-            delta=number_of_files - number_of_existing_files,
-        ),
-        sep='\n',
-    )
+                    progress.update(source_indexing_task, advance=1)
+                rich_print(f'Indexed {total_sources} sources.')
+
+            # Index blobs
+            total_blobs = await crud.count_objects(
+                session,
+                model=knowledge_models.Blob,
+            )
+            blob_indexing_task = progress.add_task(
+                'Indexing blobs...',
+                total=total_blobs,
+            )
+            blob_index_name = converters.to_blob_ix_name(context_name)
+            async with AsyncAnnoy(blob_index_name).writer() as bwriter:
+                blob_stream = await crud.stream_blobs(
+                    session,
+                    context=context_instance,
+                )
+                for blob in blob_stream:
+                    await bwriter.add_item(
+                        blob.id,
+                        converters.hex_to_vector(blob.vector_hex),
+                    )
+                    progress.update(blob_indexing_task, advance=1)
+                rich_print(f'Indexed {total_blobs} blobs.')
+
+            # Find links
+            rich_print('Flushing all existing links...')
+            await crud.remove_all_links_for(
+                session,
+                context=context_instance,
+            )
+            rich_print('Finding semantic outliers for linking...')
+            sources = await crud.stream_sources(
+                session,
+                context=context_instance,
+            )
+            outliers: dict[int, tuple] = {}
+            for src in sources:
+                outliers.update(await find_outliers_for(src))
+            total_outliers = len(outliers)
+            rich_print(f'Found {total_outliers} outliers.')
+            linking_task = progress.add_task(
+                'Linking outliers...',
+                total=total_outliers,
+            )
+            async with AsyncAnnoy(source_index_name).reader() as source_reader:
+                for blb, vector, origin_distance in outliers.values():
+                    destination_ids = await source_reader.get_neighbours_for(
+                        vector=vector,
+                        n=1,
+                    )
+                    destination = await crud.get_single_object(
+                        session,
+                        model=knowledge_models.Source,
+                        object_id=destination_ids[0],
+                    )
+                    await crud.create_link(
+                        session,
+                        blob=blb,
+                        target_source=destination,
+                        origin_distance=origin_distance,
+                        destination_distance=0,
+                    )
+                    progress.update(linking_task, advance=1)
+                await session.commit()
+                rich_print('Linked all outliers.')
+    rich_print('Done!')

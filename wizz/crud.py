@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from functools import wraps
-from typing import Type
 
+from sqlalchemy import func
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,15 +10,15 @@ from wizz.models import base
 from wizz.models import knowledge
 
 
-def optional_commit(func):
+def optional_commit(crud_function):
     """Decorator to optionally commit the session after the function call."""
-    @wraps(func)
+    @wraps(crud_function)
     async def wrapper(
         *args,
         commit: bool = True,
         **kwargs,
     ):
-        original_result = await func(*args, **kwargs)
+        original_result = await crud_function(*args, **kwargs)
         if commit:
             await args[0].commit()
         return original_result
@@ -139,6 +139,17 @@ async def get_single_object(
 ) -> base.Base | None:
     """Get an object of the specified model by its ID."""
     return await session.get(model, object_id)
+
+
+async def count_objects(
+    session: AsyncSession,
+    *,
+    model: type[base.Base],
+) -> int:
+    """Count the number of objects of the specified model."""
+    return await session.scalar(
+        select(func.count()).select_from(model),
+    )
 
 
 async def stream_sources(

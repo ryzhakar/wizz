@@ -28,104 +28,6 @@ app = typer.Typer(invoke_without_command=False)
 
 
 @synchronize_async_command(app)
-async def delete(  # noqa: WPS210, WPS217
-    context_name: str = typer.Option(  # noqa: WPS404, B008
-        ...,
-        help='The name of the context to bind the knowledge to.',
-    ),
-):
-    """Delete a context and all its associated sources and blobs."""
-    confirmed = rich_prompt.Confirm.ask(
-        f'This means deleting the knowledge base for {context_name}. '
-        'Are you sure?',
-    )
-    if not confirmed:
-        return rich_print('Aborted.')
-    async with get_db_session() as session:
-        context_instance = await crud.get_or_create_context(
-            session,
-            name=context_name,
-        )
-        await crud.cascade_delete_context(
-            session,
-            context=context_instance,
-        )
-        # No need to delete the Annoy index,
-        # because it will be overwritten on the next load.
-
-
-@synchronize_async_command(app)
-async def interact(  # noqa: WPS210, WPS217
-    context_name: str = typer.Option(  # noqa: WPS404, B008
-        ...,
-        help='The name of the context to bind the knowledge to.',
-    ),
-):
-    """Search the knowledge base for a query."""
-    retriever = Retriever()
-    embedder = Embedder()
-    async with get_db_session() as session:
-        blob_ix_name = converters.to_blob_ix_name(context_name)
-        async with AsyncAnnoy(blob_ix_name).reader() as reader:
-            while query := rich_prompt.Prompt.ask('\n\n'):
-                query = retriever.construct_query(query)
-                lookup_indices = await reader.get_neighbours_for(
-                    vector=embedder(query),
-                    n=5,
-                )
-                multiple_blobs = await crud.load_set_of_blobs(
-                    session,
-                    blob_ids=set(lookup_indices),
-                )
-                sources = await asyncio.gather(
-                    *(blob.awaitable_attrs.source for blob in multiple_blobs),
-                )
-                ellipted_texts = [
-                    retriever.wrap_result(source.name, blob.text)
-                    for source, blob in zip(sources, multiple_blobs)
-                ]
-                answer = retriever.request_answer_based_on(
-                    *ellipted_texts,
-                    query=query,
-                )
-                rich_print(answer, sep='\n\n')
-    rich_print('Goodbye!')
-
-
-@synchronize_async_command(app)
-async def search(  # noqa: WPS210, WPS217
-    context_name: str = typer.Option(  # noqa: WPS404, B008
-        ...,
-        help='The name of the context to bind the knowledge to.',
-    ),
-):
-    """Search the knowledge base for a query."""
-    embedder = Embedder()
-    retriever = Retriever()
-    async with get_db_session() as session:
-        blob_ix_name = converters.to_blob_ix_name(context_name)
-        async with AsyncAnnoy(blob_ix_name).reader() as reader:
-            while query := rich_prompt.Prompt.ask('Enter a query'):
-                lookup_indices = await reader.get_neighbours_for(
-                    vector=embedder(query),
-                    n=5,
-                )
-                multiple_blobs = await crud.load_set_of_blobs(
-                    session,
-                    blob_ids=set(lookup_indices),
-                )
-                sources = await asyncio.gather(
-                    *(blob.awaitable_attrs.source for blob in multiple_blobs),
-                )
-                ellipted_texts = [
-                    retriever.wrap_result(source.name, blob.text)
-                    for source, blob in zip(sources, multiple_blobs)
-                ]
-                rich_print(*ellipted_texts, sep='\n\n')
-    rich_print('Goodbye!')
-
-
-@synchronize_async_command(app)
 async def load(  # noqa: WPS210, WPS213, WPS217
     context_name: str = typer.Option(  # noqa: WPS404, B008
         ...,
@@ -308,3 +210,101 @@ async def index(  # noqa: WPS210, WPS213, WPS217
                 await session.commit()
                 rich_print('Linked all outliers.')
     rich_print('Done!')
+
+
+@synchronize_async_command(app)
+async def search(  # noqa: WPS210, WPS217
+    context_name: str = typer.Option(  # noqa: WPS404, B008
+        ...,
+        help='The name of the context to bind the knowledge to.',
+    ),
+):
+    """Search the knowledge base for a query."""
+    embedder = Embedder()
+    retriever = Retriever()
+    async with get_db_session() as session:
+        blob_ix_name = converters.to_blob_ix_name(context_name)
+        async with AsyncAnnoy(blob_ix_name).reader() as reader:
+            while query := rich_prompt.Prompt.ask('Enter a query'):
+                lookup_indices = await reader.get_neighbours_for(
+                    vector=embedder(query),
+                    n=5,
+                )
+                multiple_blobs = await crud.load_set_of_blobs(
+                    session,
+                    blob_ids=set(lookup_indices),
+                )
+                sources = await asyncio.gather(
+                    *(blob.awaitable_attrs.source for blob in multiple_blobs),
+                )
+                ellipted_texts = [
+                    retriever.wrap_result(source.name, blob.text)
+                    for source, blob in zip(sources, multiple_blobs)
+                ]
+                rich_print(*ellipted_texts, sep='\n\n')
+    rich_print('Goodbye!')
+
+
+@synchronize_async_command(app)
+async def interact(  # noqa: WPS210, WPS217
+    context_name: str = typer.Option(  # noqa: WPS404, B008
+        ...,
+        help='The name of the context to bind the knowledge to.',
+    ),
+):
+    """Interact with LLM that has access to the knowledge base."""
+    retriever = Retriever()
+    embedder = Embedder()
+    async with get_db_session() as session:
+        blob_ix_name = converters.to_blob_ix_name(context_name)
+        async with AsyncAnnoy(blob_ix_name).reader() as reader:
+            while query := rich_prompt.Prompt.ask('\n\n'):
+                query = retriever.construct_query(query)
+                lookup_indices = await reader.get_neighbours_for(
+                    vector=embedder(query),
+                    n=5,
+                )
+                multiple_blobs = await crud.load_set_of_blobs(
+                    session,
+                    blob_ids=set(lookup_indices),
+                )
+                sources = await asyncio.gather(
+                    *(blob.awaitable_attrs.source for blob in multiple_blobs),
+                )
+                ellipted_texts = [
+                    retriever.wrap_result(source.name, blob.text)
+                    for source, blob in zip(sources, multiple_blobs)
+                ]
+                answer = retriever.request_answer_based_on(
+                    *ellipted_texts,
+                    query=query,
+                )
+                rich_print(answer, sep='\n\n')
+    rich_print('Goodbye!')
+
+
+@synchronize_async_command(app)
+async def delete(  # noqa: WPS210, WPS217
+    context_name: str = typer.Option(  # noqa: WPS404, B008
+        ...,
+        help='The name of the context to bind the knowledge to.',
+    ),
+):
+    """Delete a context and all its associated sources and blobs."""
+    confirmed = rich_prompt.Confirm.ask(
+        f'This means deleting the knowledge base for {context_name}. '
+        'Are you sure?',
+    )
+    if not confirmed:
+        return rich_print('Aborted.')
+    async with get_db_session() as session:
+        context_instance = await crud.get_or_create_context(
+            session,
+            name=context_name,
+        )
+        await crud.cascade_delete_context(
+            session,
+            context=context_instance,
+        )
+        # No need to delete the Annoy index,
+        # because it will be overwritten on the next load.

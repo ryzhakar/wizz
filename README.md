@@ -1,4 +1,4 @@
-# Wizz: AI-Enhanced Document Tool
+# Wizz: LLM chat with knowledge base access
 
 Wizz is a proof-of-concept tool that helps you work with large collections of documents using AI. It can understand your documents and answer questions about them.
 
@@ -50,7 +50,7 @@ wizz knowledge --help
 
 While Wizz currently works as a standalone tool, its core features are designed with future web integration in mind.
 The code uses async programming, preparing it for potential use with ASGI web servers in the future.
-I developed a custom async wrapper library called `async-annoy` for the vector search tool 'annoy' (by Spotify). You can find it [here](https://github.com/ryzhakar/async-annoy).
+I developed a custom async wrapper library called [async-annoy](https://github.com/ryzhakar/async-annoy) for the vector search tool 'annoy' (by Spotify).
 
 ## Important Note
 
